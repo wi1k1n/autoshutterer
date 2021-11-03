@@ -16,6 +16,7 @@
 #include "ota.h"
 #include "credentials.h"
 #include "calibration.h"
+#include "externalsignal.h"
 
 // Replace with your network credentials
 const char* ssid = WIFI_SSID;
@@ -26,24 +27,33 @@ const int PIN_SERVO = D6;
 const int PIN_BTN = D5;
 const int EEPROM_SIZE = 1024;
 
+enum {
+  TASK_OFF,
+  TASK_EXTERNAL,
+  TASK_INTERNAL,
+  TASK_CALIBRATION
+};
+
 Servo servo;
 int task;  // 0: off, 1: external signals, 2: internal schedule, 3: calibration
-int offset = 0;
-int scale_left = 1, scale_right = 1;
+bool boundariesInitialized;
 
 TimerLED timer_led(PIN_LED, true);
 bool led_state;
 EncButton <EB_TICK, PIN_BTN> btn;
-CalibrationServer server(servo, PIN_SERVO, [](uint8_t _l, uint8_t _c, uint8_t _r) {
+ExternalServer srvExternal(servo, PIN_SERVO);
+CalibrationServer srvCalib(servo, PIN_SERVO, [](uint8_t _l, uint8_t _c, uint8_t _r) {
   EEPROM.begin(EEPROM_SIZE);
   if (!_l && !_c && !_r) {
     EEPROM.put(0, 0);
+    boundariesInitialized = false;
     Serial.print(F("[EEPROM] Boundaries cleared from EEPROM"));
   } else {
     EEPROM.put(0, 42);
     EEPROM.put(1, _l);
     EEPROM.put(2, _c);
     EEPROM.put(3, _r);
+    boundariesInitialized = true;
     Serial.print(F("[EEPROM] Servo calibration saved: "));
     Serial.print((int)_l);
     Serial.print(F("; "));
@@ -62,7 +72,11 @@ void InitializeServoBoundariesFromEEPROM() {
     EEPROM.get(1, _l);
     EEPROM.get(2, _c);
     EEPROM.get(3, _r);
-    server.setBoundaries(_l, _c, _r);
+
+    boundariesInitialized = true;
+    srvCalib.setBoundaries(_l, _c, _r);
+    srvExternal.setBoundaries(_l, _c, _r);
+
     Serial.print(F("[EEPROM] Servo calibration restored: "));
     Serial.print((int)_l);
     Serial.print(F("; "));
@@ -70,38 +84,58 @@ void InitializeServoBoundariesFromEEPROM() {
     Serial.print(F("; "));
     Serial.println((int)_r);
   } else {
+    boundariesInitialized = false;
     Serial.println(F("[EEPROM] StartByte is not 42. No calibration restored"));
   }
   EEPROM.end();
 }
 
+void StartExternal() {
+  srvExternal.start();
+}
+void StopExternal() {
+  srvExternal.stop();
+}
+
 void StartCalibration() {
-  server.start();
+  srvCalib.start();
+}
+void StopCalibration() {
+  srvCalib.stop();
 }
 
 void changeTask(const int& _task) {
   task = _task;
+
+  if (task != TASK_CALIBRATION) {
+    StopCalibration();
+  }
+  if (task != TASK_EXTERNAL) {
+    StopExternal();
+  }
+  
   switch (task) {
-    case 0:
-      timer_led.setIntervals(2925, 25);
-      // Off
+    case TASK_OFF:
+      // timer_led.setIntervals(2925, 25);
+      timer_led.stop();
       break;
-    case 1:
-      timer_led.setIntervals(725, 25);
-      // External signals
+    case TASK_EXTERNAL:
+      timer_led.setIntervals(5, (const uint16_t[]){725, 25, 725, 25, 5000-725});
+      timer_led.restart();
+      StartExternal();
       break;
-    case 2:
+    case TASK_INTERNAL:
       timer_led.setIntervals(100, 250, 1600, 50);
-      // Internal schedule
+      timer_led.restart();
       break;
-    case 3:
-      timer_led.setIntervals(50, 50);
+    case TASK_CALIBRATION:
+      timer_led.setIntervals(100, 100);
+      timer_led.restart();
       StartCalibration();
       break;
     default:
       break;
   }
-  timer_led.restart();
   Serial.print("Task changed to #");
   Serial.println(task);
 }
@@ -130,8 +164,7 @@ void setup() {
   Serial.println("[ESP] Booting");
   
   InitializeServoBoundariesFromEEPROM();
-
-  changeTask(3);
+  changeTask(boundariesInitialized ? TASK_EXTERNAL : TASK_CALIBRATION);
 
   configureWiFi();
   OTA::setup();
@@ -158,14 +191,17 @@ void loop() {
   }
 
   switch (task) {
-    case 0:  // Off
+    case TASK_OFF:
       break;
-    case 1: // External signals
+    case TASK_EXTERNAL:
+      srvExternal.listen();
       break;
-    case 2: // Internal schedule
+    case TASK_INTERNAL:
       break;
-    default: // Calibration
-      server.listen();
+    case TASK_CALIBRATION:
+      srvCalib.listen();
+      break;
+    default:
       break;
   }
 }

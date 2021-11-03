@@ -10,33 +10,36 @@ private:
     ESP8266WebServer* _server;
     Servo* _servo;
     uint8_t _pos{90};
-    int _servo_pin{0};
+    int _servo_pin;
     uint8_t _left{85}, _center{90}, _right{95};
-    bool _initialized{false};
+    bool _initialized;
     std::function<void(uint8_t, uint8_t, uint8_t)> _store;
 public:
     CalibrationServer(Servo &servo, const int servo_pin, const std::function<void(uint8_t, uint8_t, uint8_t)>& storeFunc, const uint16_t port = 80) {
         _server = new ESP8266WebServer(port);
         _servo = &servo;
         _servo_pin = servo_pin;
-        _servo->attach(_servo_pin);
         _store = storeFunc;
 
         _server->on("/", [this]() {
+            if (!authorize()) return;
             sendMainPage();
         });
         _server->on("/cc", [this]() { // Center
+            if (!authorize()) return;
             _pos = 90;
             setServo(_pos);
             sendMainPage(F("Set to center"));
         });
         _server->on("/ls", [this]() { // <
+            if (!authorize()) return;
             if (_pos > 0)
                 _pos--;
             setServo(_pos);
             sendMainPage(F("Tiny left"));
         });
         _server->on("/ll", [this]() { // <<<
+            if (!authorize()) return;
             if (_pos >= 5)
                 _pos -= 5;
             else
@@ -45,12 +48,14 @@ public:
             sendMainPage(F("Step left"));
         });
         _server->on("/rs", [this]() { // >
+            if (!authorize()) return;
             if (_pos < 180)
                 _pos++;
             setServo(_pos);
             sendMainPage(F("Tiny right"));
         });
         _server->on("/rl", [this]() { // >>>
+            if (!authorize()) return;
             if (_pos <= 175)
                 _pos += 5;
             else
@@ -59,44 +64,67 @@ public:
             sendMainPage(F("Step right"));
         });
         _server->on("/sl", [this]() { // Save left
+            if (!authorize()) return;
             _left = _pos;
+            _initialized = true;
             sendMainPage(F("Saved left"));
         });
         _server->on("/sc", [this]() { // Save center
+            if (!authorize()) return;
             _center = _pos;
+            _initialized = true;
             sendMainPage(F("Saved center"));
         });
         _server->on("/sr", [this]() { // Save right
+            if (!authorize()) return;
             _right = _pos;
+            _initialized = true;
             sendMainPage(F("Saved right"));
         });
         _server->on("/st", [this]() { // Store in EEPROM
+            if (!authorize()) return;
             _store(_left, _center, _right);
             sendMainPage(F("Stored in EEPROM"));
         });
         _server->on("/dl", [this]() { // Clear EEPROM
+            if (!authorize()) return;
             _store(0, 0, 0);
+            _left = _center = _right = 0;
+            _initialized = false;
             sendMainPage(F("EEPROM cleared"));
         });
         _server->on("/gl", [this]() { // Set left
+            if (!authorize()) return;
             setServo(_left);
             sendMainPage(F("Set to left"));
         });
         _server->on("/gc", [this]() { // Set center
+            if (!authorize()) return;
             setServo(_center);
             sendMainPage(F("Set to center"));
         });
         _server->on("/gr", [this]() { // Set right
+            if (!authorize()) return;
             setServo(_right);
             sendMainPage(F("Set to right"));
         });
+        _server->onNotFound([this]() {
+            if (!authorize()) return;
+            _server->send(404, "text/plain", "not found");
+        });
+    }
+    ~CalibrationServer() {
+        delete _server;
     }
     void start() {
+        _servo->attach(_servo_pin);
         _server->begin();
-        Serial.print(F("[Calibration] WiFi server started"));
+        Serial.println(F("[Calibration] Webserver started"));
     };
     void stop() {
+        _servo->detach();
         _server->stop();
+        Serial.println(F("[Calibration] Webserver stopped"));
     }
     void listen() {
         _server->handleClient();
@@ -110,6 +138,13 @@ public:
 private:
     void setServo(uint8_t val) {
         _servo->write(val);
+    }
+    bool authorize() {
+        if (!_server->authenticate(WEB_LOGIN, WEB_PASSWORD)) {
+            _server->requestAuthentication(DIGEST_AUTH);
+            return false;
+        }
+        return true;
     }
     void sendMainPage(const String& msg = "") {
         String content = "";
@@ -131,11 +166,13 @@ private:
         content += _center;
         content += "; ";
         content += _right;
-        content += F("</h5><div>");
-        content += F("<a href=\"gl\" class=\"btn btn-lg btn-secondary m-1\"> Set left </a>");
-        content += F("<a href=\"gc\" class=\"btn btn-lg btn-secondary m-1\"> Set center </a>");
-        content += F("<a href=\"gr\" class=\"btn btn-lg btn-secondary m-1\"> Set right </a>");
-        content += F("</div><div>");
+        content += F("</h5>");
+        if (_initialized) {
+            content += F("<div><a href=\"gl\" class=\"btn btn-lg btn-secondary m-1\"> Set left </a>");
+            content += F("<a href=\"gc\" class=\"btn btn-lg btn-secondary m-1\"> Set center </a>");
+            content += F("<a href=\"gr\" class=\"btn btn-lg btn-secondary m-1\"> Set right </a></div>");
+        }
+        content += F("<div>");
         content += F("<a href=\"sl\" class=\"btn btn-lg btn-warning m-1\"> Save left </a>");
         content += F("<a href=\"sc\" class=\"btn btn-lg btn-warning m-1\"> Save center </a>");
         content += F("<a href=\"sr\" class=\"btn btn-lg btn-warning m-1\"> Save right </a>");
