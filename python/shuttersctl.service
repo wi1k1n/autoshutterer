@@ -1,0 +1,11 @@
+[Unit]
+Description=Control Electric Shutters using Web requests
+
+[Service]
+Type=simple
+User=pi
+ExecStart= /home/pi/shutters/venv/bin/python /home/pi/shutters/scheduler.py
+Restart=always
+
+[Install]
+WantedBy=default.target
