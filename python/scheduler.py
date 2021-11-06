@@ -13,6 +13,7 @@ CONFIGURATION_PATH = "config.ini"
 SR_ADD_HOURS = 0.0  # how many hours to add to 'sunrise' time (can be negative)
 SS_ADD_HOURS = 0.0  # how many hours to add to 'sunset' time (can be negative)
 WEB_LOGIN = WEB_PASSWORD = IP_ADDRESS = city = None
+DEBUG = False
 
 
 def MoveShutters(dir = 0):
@@ -22,8 +23,9 @@ def MoveShutters(dir = 0):
     def makeRequest(n = 0):
         if n > 2:
             return
-        print("[DEBUG] Getting URL: {0}".format(url))
-        return
+        if DEBUG:
+            print("[DEBUG] Getting URL: {0}".format(url))
+            return
         res = requests.get(url, auth=requests.auth.HTTPDigestAuth(WEB_LOGIN, WEB_PASSWORD))
         if res.status_code != 200:
             print("{0} [Error] Error occurred while sending move request:".format(dt.datetime.now()))
@@ -86,10 +88,10 @@ if __name__ == '__main__':
 
     while True:
         now = dt.datetime.now().replace(tzinfo=pytz.UTC)
-        # # DEBUG
-        # now = dt.datetime(2021, 11, 4, 8, 7, 40, tzinfo=pytz.UTC)
-        # print("=>  {0}".format(now))
-        # # /DEBUG
+        if DEBUG:
+            now = dt.datetime(2021, 11, 7, 8, 13, 30, tzinfo=pytz.UTC)
+            print("=>  {0}".format(now))
+
         sr, ss = GetSunriseSet(now.date(), city.observer)
 
         if now.timestamp() < sr.timestamp():
