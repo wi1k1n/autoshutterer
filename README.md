@@ -12,6 +12,7 @@ Only external scheduling (e.g. using external python script) supported atm.
 C++:
 - [TimerLED](https://github.com/wi1k1n/TimerLED)
 - Other dependencies listed in platformio.ini
+
 Python 3.7:
 - requests
 - astral
