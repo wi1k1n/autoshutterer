@@ -6,5 +6,5 @@
 .idea
 venv
 
-credentials.py
 credentials.h
+config.ini
