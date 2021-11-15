@@ -104,7 +104,10 @@ def getWeatherInfo(date, closest=True):
     # Gets date and returns (el, em) - entries from the forecast for the time period that contains given date
     # Returns (None, em) if there is no entry earlier than date and (el, None) if there is no entry later than date
     url = 'https://api.openweathermap.org/data/2.5/onecall?units=metric&appid='+WEATHER_API_KEY+'&lat='+str(ADDRESS_LATITUDE)+'&lon='+str(ADDRESS_LONGITUDE)
-    resp = requests.get(url).json()
+    try:
+        resp = requests.get(url).json()
+    except:
+        return None if closest else None, None
 
     l = []
     if 'current' in resp:
