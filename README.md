@@ -1,6 +1,6 @@
 # Auto Window Shutters Manager
 
-Automatically controls electric shutters depending on datetime and location (open after the sunrise and close on the sunset). 
+Automatically controls electric shutters depending on datetime, location and weather (open after the sunrise and close on the sunset). 
 
 ![](img/final_setup.jpg)
 
@@ -16,6 +16,9 @@ C++:
 Python 3.7:
 - requests
 - astral
+- colorama
+
+API key of https://openweathermap.org/ is required.
 
 ### Hardware:
 - ESP8266 ([NodeMCU](https://www.nodemcu.com/index_en.html))
