@@ -93,11 +93,9 @@ def GetSunriseSet(date, observer):
     ssc, cls = adjustClouds(ss, -1)
 
     print(Fore.CYAN+'Golden Hour'+Fore.RESET+' ends at {0}.\n'
-          'Offsetting:         {1}.\n'
-          'After forecasting:  {2}{3}.'.format(gh[1], sr, src, '' if clr is None else ' (Clouds {0:.0f}%)'.format(clr * 100.0)))
+          'Offsetting:         {1}.{2}'.format(gh[1], sr, '' if clr is None else '\nAfter forecasting:  {0}. (Clouds {1:.0f}%)'.format(src, clr * 100.0)))
     print(Fore.YELLOW+'Dusk'+Fore.RESET+' starts at      {0}.\n'
-          'Offsetting:         {1}.\n'
-          'After forecasting:  {2}{3}.'.format(dsk, ss, ssc, '' if cls is None else ' (Clouds {0:.0f}%)'.format(cls * 100.0)))
+          'Offsetting:         {1}.{2}'.format(dsk, ss, '' if cls is None else '\nAfter forecasting:  {0}. (Clouds {1:.0f}%)'.format(ssc, cls * 100.0)))
     return src, ssc
 
 def getWeatherInfo(date, closest=True):
@@ -107,6 +105,7 @@ def getWeatherInfo(date, closest=True):
     try:
         resp = requests.get(url).json()
     except:
+        print(">  Error occurred when getting weather info. Check your internet connection")
         return None if closest else None, None
 
     l = []
